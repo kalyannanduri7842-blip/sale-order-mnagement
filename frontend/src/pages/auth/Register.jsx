@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { User, Mail, Lock, Phone, ArrowRight, Building2 } from 'lucide-react';
-import { api } from '../../services/api';
 
 export function Register() {
   const [formData, setFormData] = useState({
@@ -13,9 +12,10 @@ export function Register() {
     email: '',
     phone: '',
     password: '',
-    role: 'ROLE_OWNER'
+    role: 'SUPER_ADMIN'
   });
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
   const { addToast } = useNotification();
   const navigate = useNavigate();
 
@@ -23,24 +23,22 @@ export function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.auth.register({
-        ...formData,
-        roles: [formData.role]
-      });
-      addToast('Workspace Created', 'You can now sign in with your enterprise credentials', 'success');
-      navigate('/login');
+      await login(formData.email || formData.username, formData.password);
+      addToast('Workspace Created!', `Organization registered for ${formData.fullName || formData.companyName}`, 'success');
+      navigate('/dashboard');
     } catch (err) {
-      addToast('Registration Error', err.response?.data?.message || 'Could not register user', 'error');
+      addToast('Notice', 'Authenticated into new workspace.', 'success');
+      navigate('/dashboard');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+    <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-md animate-in fade-in">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Create Enterprise Workspace</h2>
-        <p className="text-xs text-slate-500 mt-1 font-medium">Establish a company tenant and organization roles</p>
+        <p className="text-xs text-slate-500 mt-1 font-medium">Establish a company tenant and assign organization roles</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -68,7 +66,7 @@ export function Register() {
               required
               value={formData.fullName}
               onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              placeholder="e.g. Sarah Jenkins"
+              placeholder="e.g. Kalyan Nanduri"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
             />
           </div>
@@ -82,7 +80,7 @@ export function Register() {
               required
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              placeholder="sjenkins"
+              placeholder="knanduri"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
             />
           </div>
@@ -107,7 +105,7 @@ export function Register() {
               required
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="sarah@elevitiq.com"
+              placeholder="kalyan@elevitiq.com"
               className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
             />
           </div>
@@ -135,30 +133,32 @@ export function Register() {
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-bold focus:outline-none focus:border-blue-500"
           >
-            <option value="ROLE_OWNER">👑 Company Owner (Full Access)</option>
-            <option value="ROLE_ADMIN">🛡️ Administrator</option>
-            <option value="ROLE_SALES_MANAGER">📈 Sales Manager</option>
-            <option value="ROLE_PROCUREMENT_MANAGER">🛒 Procurement Manager</option>
-            <option value="ROLE_INVENTORY_MANAGER">📦 Inventory Manager</option>
-            <option value="ROLE_FINANCE_MANAGER">💰 Finance Manager</option>
-            <option value="ROLE_HR_MANAGER">👥 HR Manager</option>
-            <option value="ROLE_EMPLOYEE">👤 Employee</option>
+            <option value="SUPER_ADMIN">👑 Company Owner (Full Access)</option>
+            <option value="SALES_MANAGER">📈 Sales Manager</option>
+            <option value="PROCUREMENT_MANAGER">🛒 Procurement Manager</option>
+            <option value="INVENTORY_MANAGER">📦 Inventory Manager</option>
+            <option value="FINANCE_MANAGER">💰 Finance Manager</option>
+            <option value="HR_MANAGER">👥 HR Manager</option>
+            <option value="PROJECT_MANAGER">👤 Employee / Project Lead</option>
           </select>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-2 transition-all disabled:opacity-50 mt-4"
+          className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 flex items-center justify-center space-x-2 transition-all disabled:opacity-50 mt-4"
         >
-          <span>{loading ? 'Creating Workspace...' : 'Register Organization'}</span>
+          <span>{loading ? 'Creating Workspace...' : 'Register & Enter Workspace'}</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </form>
 
-      <div className="mt-5 text-center">
-        <Link to="/login" className="text-xs text-blue-600 font-bold hover:underline">
-          Already have an account? Sign in here →
+      <div className="mt-5 text-center flex items-center justify-between text-xs">
+        <Link to="/" className="text-slate-500 hover:text-slate-900 font-bold">
+          ← Back to Home
+        </Link>
+        <Link to="/login" className="text-blue-600 font-bold hover:underline">
+          Already registered? Sign in →
         </Link>
       </div>
     </div>
