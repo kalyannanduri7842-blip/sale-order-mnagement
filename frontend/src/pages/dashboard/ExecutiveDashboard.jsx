@@ -1,23 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StatCard } from '../../components/ui/StatCard';
 import { Badge } from '../../components/ui/Badge';
-import { api } from '../../services/api';
+import { useErpData } from '../../context/ErpDataContext';
+import { useNotification } from '../../context/NotificationContext';
 import {
   DollarSign,
   TrendingUp,
   Package,
   Users,
-  Building2,
-  FolderKanban,
   ShoppingCart,
   PlusCircle,
-  FileCheck,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Receipt,
-  Truck
+  RefreshCw,
+  Trash2,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -39,44 +37,72 @@ import { Link } from 'react-router-dom';
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 export function ExecutiveDashboard() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const {
+    dashboard,
+    customers,
+    salesOrders,
+    invoices,
+    products,
+    employees,
+    expenses,
+    auditLogs,
+    loadDemoData,
+    clearAllData
+  } = useErpData();
+  const { addToast } = useNotification();
 
-  useEffect(() => {
-    async function loadData() {
-      const summary = await api.get('/dashboard/summary', 'dashboard');
-      setData(summary);
-      setLoading(false);
+  // Dynamically compute live KPIs
+  const totalSalesVal = salesOrders.reduce((sum, o) => sum + (parseFloat(o.grandTotal || o.totalAmount) || 0), 0);
+  const totalInvoicedVal = invoices.reduce((sum, i) => sum + (parseFloat(i.totalAmount) || 0), 0);
+  const totalInventoryVal = products.reduce((sum, p) => sum + (p.stockQuantity * (p.unitCost || p.sellingPrice * 0.6)), 0);
+  const totalExpensesVal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+  const lowStockCount = products.filter(p => Number(p.stockQuantity) <= Number(p.reorderLevel || 10)).length;
+  const activeStaffCount = employees.length;
+
+  const handleLoadDemo = () => {
+    loadDemoData();
+    addToast('Demo Dataset Loaded', 'Populated realistic Elevit IQ Enterprise records across all departments.', 'success');
+  };
+
+  const handleClearData = () => {
+    if (window.confirm('Are you sure you want to clear all data? You will start with an empty clean slate.')) {
+      clearAllData();
+      addToast('Data Cleared', 'Workspace cleared. You can now add your own custom records.', 'info');
     }
-    loadData();
-  }, []);
-
-  if (loading || !data) {
-    return <div className="p-12 text-center text-slate-400 text-xs">Loading Executive Dashboard KPIs...</div>;
-  }
+  };
 
   const formatCurrency = (val) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val || 0);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Demo Data Controls */}
       <PageHeader
         title="Executive Overview & Business KPIs"
-        description="Consolidated real-time metrics across all business operations, inventory, and financial ledgers"
+        description="Consolidated real-time operational telemetry across Sales, Procurement, Inventory, Finance, and HR"
         actions={
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleLoadDemo}
+              className="flex items-center px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+              title="Load demo data"
+            >
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> ⚡ Load Demo Data
+            </button>
+
+            <button
+              onClick={handleClearData}
+              className="flex items-center px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+              title="Clear all data to start fresh"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" /> 🗑️ Clear Workspace
+            </button>
+
             <Link
               to="/sales/orders"
-              className="flex items-center px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+              className="btn-primary flex items-center text-xs shadow-sm"
             >
               <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> + Sales Order
-            </Link>
-            <Link
-              to="/procurement/orders"
-              className="flex items-center px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
-            >
-              <ShoppingCart className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> + Purchase Order
             </Link>
           </div>
         }
@@ -85,40 +111,40 @@ export function ExecutiveDashboard() {
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Monthly Revenue"
-          value={formatCurrency(data.monthlyRevenue)}
-          change="+18.4% vs last mo"
+          title="Total Invoiced"
+          value={formatCurrency(totalInvoicedVal || 142500)}
+          change={`${invoices.length} Invoices`}
           isPositive={true}
           icon={DollarSign}
           color="blue"
-          subtitle={`Net Profit: ${formatCurrency(data.netProfit)}`}
+          subtitle={`Expenses: ${formatCurrency(totalExpensesVal || 58300)}`}
         />
         <StatCard
-          title="Total Sales Volume"
-          value={formatCurrency(data.totalSales)}
-          change="+12.2% YTD"
+          title="Sales Volume"
+          value={formatCurrency(totalSalesVal || 842000)}
+          change={`${salesOrders.length} Orders`}
           isPositive={true}
           icon={TrendingUp}
           color="emerald"
-          subtitle={`${data.pendingOrders || 34} orders in fulfillment`}
+          subtitle={`${customers.length} Active Enterprise Clients`}
         />
         <StatCard
-          title="Inventory Valuation"
-          value={formatCurrency(data.inventoryValuation)}
-          change={`${data.lowStockCount || 12} Low Stock Alerts`}
-          isPositive={data.lowStockCount === 0}
+          title="Inventory Assets"
+          value={formatCurrency(totalInventoryVal || 354000)}
+          change={`${lowStockCount} Low Stock`}
+          isPositive={lowStockCount === 0}
           icon={Package}
           color="amber"
-          subtitle="Across 3 Central Warehouses"
+          subtitle={`${products.length} SKU Catalog Items`}
         />
         <StatCard
-          title="Active Workforce"
-          value={`${data.activeEmployees || 186} Employees`}
-          change="98% Attendance"
+          title="Workforce Roster"
+          value={`${activeStaffCount || 48} Employees`}
+          change="100% Operational"
           isPositive={true}
           icon={Users}
           color="purple"
-          subtitle={`${data.pendingLeaves || 4} pending leave approvals`}
+          subtitle="Across 5 Corporate Divisions"
         />
       </div>
 
@@ -129,20 +155,20 @@ export function ExecutiveDashboard() {
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
             <div>
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">Revenue vs Operating Expenses (2026)</h3>
-              <p className="text-xs text-slate-400">Monthly breakdown and gross cashflow margins</p>
+              <p className="text-xs text-slate-400 font-medium">Monthly breakdown & gross margins</p>
             </div>
-            <Badge variant="success">Positive Margins</Badge>
+            <Badge variant="success">Positive Cashflow</Badge>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.monthlyRevenueChart || []}>
+              <AreaChart data={dashboard?.monthlyRevenueChart || []}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.2} />
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.15} />
                     <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
                   </linearGradient>
                 </defs>
@@ -165,13 +191,13 @@ export function ExecutiveDashboard() {
         <div className="enterprise-card p-5 bg-white border border-slate-200 shadow-sm rounded-2xl flex flex-col justify-between">
           <div className="pb-2 border-b border-slate-100">
             <h3 className="text-sm font-bold text-slate-900 tracking-tight">Revenue by Product Line</h3>
-            <p className="text-xs text-slate-400">Share of revenue distribution</p>
+            <p className="text-xs text-slate-400 font-medium">Departmental revenue distribution</p>
           </div>
           <div className="h-60 my-auto">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data.salesByProductCategory || []}
+                  data={dashboard?.salesByProductCategory || []}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
@@ -180,7 +206,7 @@ export function ExecutiveDashboard() {
                   dataKey="value"
                   nameKey="category"
                 >
-                  {(data.salesByProductCategory || []).map((entry, index) => (
+                  {(dashboard?.salesByProductCategory || []).map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -191,73 +217,47 @@ export function ExecutiveDashboard() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-100">
-            {(data.salesByProductCategory || []).map((item, idx) => (
+          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-100 font-medium">
+            {(dashboard?.salesByProductCategory || []).map((item, idx) => (
               <div key={idx} className="flex items-center space-x-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                <span className="truncate font-semibold">{item.category} ({item.value}%)</span>
+                <span className="truncate font-semibold text-slate-700">{item.category} ({item.value}%)</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Lower Row: Department Headcount & Live Audit Stream */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Department Distribution Bar Chart */}
-        <div className="enterprise-card p-5 bg-white border border-slate-200 shadow-sm rounded-2xl">
-          <h3 className="text-sm font-bold text-slate-900 tracking-tight mb-0.5">Department Workforce Allocation</h3>
-          <p className="text-xs text-slate-400 mb-4">Active headcount per operational branch</p>
-          <div className="h-60">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.departmentEmployeeDistribution || []} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis type="number" stroke="#94a3b8" fontSize={11} />
-                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={120} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#ffffff', borderColor: '#e2e8f0', borderRadius: '12px', fontSize: '11px' }}
-                />
-                <Bar dataKey="employees" fill="#4f46e5" radius={[0, 8, 8, 0]} name="Headcount" />
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Lower Section: Live Audit Stream */}
+      <div className="enterprise-card p-5 bg-white border border-slate-200 shadow-sm rounded-2xl">
+        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">Recent Operations Activity Stream</h3>
+            <p className="text-xs text-slate-400 font-medium">Live immutable audit trail of user actions & CRUD events</p>
           </div>
+          <Link to="/system/audit" className="text-xs font-bold text-blue-600 hover:underline">
+            View All Audit Logs →
+          </Link>
         </div>
 
-        {/* Live Enterprise Activity Stream */}
-        <div className="enterprise-card p-5 bg-white border border-slate-200 shadow-sm rounded-2xl flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {(auditLogs || []).slice(0, 4).map((act) => (
+            <div key={act.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 tracking-tight">Recent Operations Activity</h3>
-                <p className="text-xs text-slate-400">Live immutable ledger events & workflow triggers</p>
-              </div>
-              <Link to="/system/audit" className="text-xs font-bold text-blue-600 hover:underline">
-                View Audit Trail →
-              </Link>
-            </div>
-
-            <div className="space-y-2.5">
-              {(data.recentActivities || []).map((act) => (
-                <div key={act.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start space-x-3">
-                  <div className="p-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex-shrink-0 mt-0.5">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900 truncate">{act.action}</span>
-                      <Badge variant="primary">{act.module}</Badge>
-                    </div>
-                    <p className="text-[11px] text-slate-600 mt-0.5">{act.description}</p>
-                    <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-1">
-                      <span>By: <strong>{act.user}</strong></span>
-                      <span>•</span>
-                      <span>{new Date(act.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-between mb-1">
+                  <Badge variant="primary">{act.module}</Badge>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {new Date(act.timestamp).toLocaleTimeString()}
+                  </span>
                 </div>
-              ))}
+                <p className="text-xs font-bold text-slate-900 line-clamp-1">{act.action}</p>
+                <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{act.description}</p>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-2 font-medium">
+                By: <span className="font-bold text-slate-700">{act.user || 'Admin'}</span>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

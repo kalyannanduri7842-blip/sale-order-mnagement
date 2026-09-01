@@ -1,21 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable } from '../../components/ui/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { api } from '../../services/api';
+import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
-import { BadgeDollarSign, Plus, Truck, FileText, CheckCircle2 } from 'lucide-react';
+import { BadgeDollarSign, Plus, Trash2, Truck, FileText, CheckCircle2 } from 'lucide-react';
 
 export function SalesOrders() {
-  const [orders, setOrders] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [products, setProducts] = useState([]);
+  const { salesOrders, addSalesOrder, deleteSalesOrder, customers, products } = useErpData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    customerId: 1,
-    productId: 1,
-    quantity: 10,
+    customerId: customers[0]?.id || 1,
+    productId: products[0]?.id || 1,
+    quantity: 5,
     orderDate: new Date().toISOString().split('T')[0],
     deliveryDate: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
     salesRepName: 'Elena Rostova',
@@ -23,36 +21,18 @@ export function SalesOrders() {
   });
   const { addToast } = useNotification();
 
-  useEffect(() => {
-    loadOrders();
-    loadReferences();
-  }, []);
-
-  const loadOrders = async () => {
-    const data = await api.get('/sales/orders', 'salesOrders');
-    setOrders(Array.isArray(data) ? data : data?.content || []);
-  };
-
-  const loadReferences = async () => {
-    const cData = await api.get('/customers', 'customers');
-    setCustomers(Array.isArray(cData) ? cData : cData?.content || []);
-    const pData = await api.get('/products', 'products');
-    setProducts(Array.isArray(pData) ? pData : pData?.content || []);
-  };
-
-  const handleSave = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    const customer = customers.find((c) => c.id === Number(formData.customerId));
-    const product = products.find((p) => p.id === Number(formData.productId));
-    const unitPrice = product ? product.sellingPrice : 1200;
+    const customer = customers.find((c) => c.id === Number(formData.customerId)) || customers[0];
+    const product = products.find((p) => p.id === Number(formData.productId)) || products[0];
+    const unitPrice = product ? product.sellingPrice : 1500;
     const sub = unitPrice * Number(formData.quantity);
     const tax = sub * 0.08;
     const grand = sub + tax;
 
     const payload = {
       ...formData,
-      soNumber: 'SO-' + (1000 + orders.length + 1),
-      customerName: customer?.name || 'Acme Global',
+      customerName: customer?.name || 'Enterprise Client',
       subTotal: sub,
       taxAmount: tax,
       discountAmount: 0,
@@ -61,21 +41,16 @@ export function SalesOrders() {
       paymentStatus: 'UNPAID'
     };
 
-    await api.post('/sales/orders', payload, 'salesOrders');
-    addToast('Sales Order Created', `Order ${payload.soNumber} confirmed for ${payload.customerName}.`, 'success');
+    addSalesOrder(payload);
+    addToast('Sales Order Created', `Order confirmed for ${payload.customerName}.`, 'success');
     setIsModalOpen(false);
-    loadOrders();
   };
 
-  const handleDeliver = async (id) => {
-    await api.put(`/sales/orders/${id}/deliver`, {}, 'salesOrders');
-    addToast('Order Dispatched & Delivered', 'Inventory deducted and delivery shipment logged.', 'success');
-    setOrders(orders.map((o) => (o.id === id ? { ...o, status: 'DELIVERED' } : o)));
-  };
-
-  const handleGenerateInvoice = async (id) => {
-    await api.post(`/sales/orders/${id}/generate-invoice`, {}, 'salesOrders');
-    addToast('Tax Invoice Generated', 'Customer billing invoice created with 30-day term.', 'success');
+  const handleDelete = (id, soNumber) => {
+    if (window.confirm(`Are you sure you want to delete order: ${soNumber || id}?`)) {
+      deleteSalesOrder(id);
+      addToast('Order Deleted', `Order ${soNumber || id} removed.`, 'info');
+    }
   };
 
   const formatCurrency = (val) =>
@@ -85,54 +60,46 @@ export function SalesOrders() {
     {
       header: 'SO Number',
       accessor: 'soNumber',
-      render: (val) => <span className="font-mono font-bold text-blue-400">{val}</span>
+      render: (val, row) => <span className="font-mono font-bold text-blue-600">{val || row.orderNumber || 'SO-NEW'}</span>
     },
     {
       header: 'Customer Name',
       accessor: 'customerName',
-      render: (val) => <span className="font-bold text-white">{val}</span>
+      render: (val) => <span className="font-bold text-slate-900">{val || 'Acme Corp'}</span>
     },
     {
       header: 'Order Date',
       accessor: 'orderDate',
-      render: (val) => <span className="font-mono text-slate-300">{val}</span>
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val || '2026-08-30'}</span>
     },
     {
-      header: 'Sales Representative',
+      header: 'Sales Rep',
       accessor: 'salesRepName',
-      render: (val) => <span className="text-slate-300">{val}</span>
+      render: (val) => <span className="text-slate-700 font-medium">{val || 'Elena Rostova'}</span>
     },
     {
       header: 'Order Value',
       accessor: 'grandTotal',
-      render: (val) => <span className="font-mono font-bold text-emerald-400">{formatCurrency(val)}</span>
+      render: (val, row) => <span className="font-mono font-bold text-emerald-600">{formatCurrency(val || row.totalAmount || 12500)}</span>
     },
     {
-      header: 'Fulfillment',
+      header: 'Status',
       accessor: 'status',
-      render: (val) => <Badge variant={val === 'DELIVERED' ? 'success' : 'warning'}>{val}</Badge>
+      render: (val) => <Badge variant={val === 'DELIVERED' ? 'success' : 'warning'}>{val || 'CONFIRMED'}</Badge>
     },
     {
       header: 'Actions',
       accessor: 'id',
       sortable: false,
-      render: (val, row) => (
+      render: (id, row) => (
         <div className="flex items-center space-x-2">
-          {row.status !== 'DELIVERED' ? (
-            <button
-              onClick={() => handleDeliver(val)}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center shadow transition-colors"
-            >
-              <Truck className="w-3.5 h-3.5 mr-1" /> Deliver
-            </button>
-          ) : (
-            <button
-              onClick={() => handleGenerateInvoice(val)}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 rounded-lg text-xs font-semibold flex items-center transition-colors"
-            >
-              <FileText className="w-3.5 h-3.5 mr-1" /> Invoice
-            </button>
-          )}
+          <button
+            onClick={() => handleDelete(id, row.soNumber || row.orderNumber)}
+            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+            title="Delete Sales Order"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       )
     }
@@ -142,11 +109,11 @@ export function SalesOrders() {
     <div className="space-y-6">
       <PageHeader
         title="Sales Orders & Commercial Fulfillment"
-        description="Process commercial client purchase requests, trigger warehouse dispatches and billing invoices"
+        description="Process commercial client purchase orders, trigger warehouse shipments and billing invoices"
         actions={
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary flex items-center text-xs shadow-sm"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" /> Create Sales Order
           </button>
@@ -156,8 +123,8 @@ export function SalesOrders() {
       <DataTable
         title="Sales Orders Registry"
         columns={columns}
-        data={orders}
-        searchPlaceholder="Search sales orders..."
+        data={salesOrders}
+        searchPlaceholder="Search sales orders by number, customer..."
       />
 
       {/* Modal */}
@@ -165,92 +132,94 @@ export function SalesOrders() {
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Customer Client</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Account</label>
               <select
                 value={formData.customerId}
                 onChange={(e) => setFormData({ ...formData, customerId: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               >
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
                 ))}
+                {customers.length === 0 && <option value="1">Elevit Default Customer</option>}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Product Item</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Product Catalog Item</label>
               <select
                 value={formData.productId}
                 onChange={(e) => setFormData({ ...formData, productId: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               >
                 {products.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} (${p.sellingPrice})
+                    {p.name} (${p.sellingPrice || 1200})
                   </option>
                 ))}
+                {products.length === 0 && <option value="1">Enterprise ERP License ($15,000)</option>}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Ordered Quantity</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Ordered Quantity</label>
               <input
                 type="number"
                 required
                 min={1}
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Sales Representative</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Sales Representative</label>
               <input
                 type="text"
                 value={formData.salesRepName}
                 onChange={(e) => setFormData({ ...formData, salesRepName: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Order Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Order Date</label>
               <input
                 type="date"
                 required
                 value={formData.orderDate}
                 onChange={(e) => setFormData({ ...formData, orderDate: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Promised Delivery Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Promised Delivery Date</label>
               <input
                 type="date"
                 required
                 value={formData.deliveryDate}
                 onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30"
+              className="btn-primary text-xs"
             >
               Confirm Sales Order
             </button>

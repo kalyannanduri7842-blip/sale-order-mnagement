@@ -3,21 +3,50 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable } from '../../components/ui/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
-import { FileCheck2, Printer, CheckCircle, Clock } from 'lucide-react';
+import { FileCheck2, Plus, Trash2, DollarSign, Send } from 'lucide-react';
 
 export function Invoices() {
-  const [invoices, setInvoices] = useState([
-    { id: 1, invoiceNumber: 'INV-1001', salesOrderNumber: 'SO-1001', customerName: 'Acme Global Technologies Inc', invoiceDate: '2026-08-28', dueDate: '2026-09-28', totalAmount: 57320.0, paidAmount: 57320.0, status: 'PAID' },
-    { id: 2, invoiceNumber: 'INV-1002', salesOrderNumber: 'SO-1002', customerName: 'Apex Health Systems LLC', invoiceDate: '2026-08-29', dueDate: '2026-09-29', totalAmount: 19440.0, paidAmount: 0.0, status: 'ISSUED' }
-  ]);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const { invoices, addInvoice, deleteInvoice, customers } = useErpData();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    customerId: customers[0]?.id || 1,
+    invoiceNumber: '',
+    totalAmount: 18500,
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+    notes: 'Payment terms: Net 30 days.'
+  });
   const { addToast } = useNotification();
 
-  const handleMarkPaid = (id) => {
-    setInvoices(invoices.map((inv) => (inv.id === id ? { ...inv, status: 'PAID', paidAmount: inv.totalAmount } : inv)));
-    addToast('Payment Reconciled', 'Invoice balance fully settled in Accounts Receivable ledger.', 'success');
+  const handleSave = (e) => {
+    e.preventDefault();
+    const customer = customers.find(c => c.id === Number(formData.customerId)) || customers[0];
+    const total = parseFloat(formData.totalAmount) || 15000;
+    const sub = total * 0.92;
+    const tax = total * 0.08;
+
+    const payload = {
+      ...formData,
+      customerName: customer?.name || 'Acme Global Corp',
+      subTotal: sub,
+      taxAmount: tax,
+      totalAmount: total,
+      balance: total,
+      paidAmount: 0,
+      status: 'SENT'
+    };
+
+    addInvoice(payload);
+    addToast('Invoice Issued', `Invoice sent to ${payload.customerName}.`, 'success');
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (id, num) => {
+    if (window.confirm(`Are you sure you want to delete invoice: ${num || id}?`)) {
+      deleteInvoice(id);
+      addToast('Invoice Deleted', `Invoice ${num || id} has been removed.`, 'info');
+    }
   };
 
   const formatCurrency = (val) =>
@@ -27,62 +56,45 @@ export function Invoices() {
     {
       header: 'Invoice #',
       accessor: 'invoiceNumber',
-      render: (val) => <span className="font-mono font-bold text-blue-400">{val}</span>
+      render: (val) => <span className="font-mono font-bold text-blue-600">{val || 'INV-NEW'}</span>
     },
     {
-      header: 'Sales Order Ref',
-      accessor: 'salesOrderNumber',
-      render: (val) => <span className="font-mono text-slate-300">{val || '—'}</span>
-    },
-    {
-      header: 'Customer Client',
+      header: 'Customer',
       accessor: 'customerName',
-      render: (val) => <span className="font-bold text-white">{val}</span>
+      render: (val) => <span className="font-bold text-slate-900">{val || 'Acme Corp'}</span>
     },
     {
       header: 'Issue Date',
-      accessor: 'invoiceDate',
-      render: (val) => <span className="font-mono text-slate-400">{val}</span>
+      accessor: 'issueDate',
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val || '2026-08-30'}</span>
     },
     {
       header: 'Due Date',
       accessor: 'dueDate',
-      render: (val) => <span className="font-mono text-slate-400">{val}</span>
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val || '2026-09-30'}</span>
     },
     {
-      header: 'Total Due',
+      header: 'Total Amount',
       accessor: 'totalAmount',
-      render: (val) => <span className="font-mono font-bold text-white">{formatCurrency(val)}</span>
+      render: (val, row) => <span className="font-mono font-bold text-emerald-600">{formatCurrency(val || row.grandTotal || 18500)}</span>
     },
     {
-      header: 'Billing Status',
+      header: 'Status',
       accessor: 'status',
-      render: (val) => <Badge variant={val === 'PAID' ? 'success' : 'warning'}>{val}</Badge>
+      render: (val) => <Badge variant={val === 'PAID' ? 'success' : 'warning'}>{val || 'SENT'}</Badge>
     },
     {
       header: 'Actions',
       accessor: 'id',
       sortable: false,
-      render: (val, row) => (
-        <div className="flex items-center space-x-2">
-          {row.status !== 'PAID' && (
-            <button
-              onClick={() => handleMarkPaid(val)}
-              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shadow transition-colors"
-            >
-              Record Payment
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setSelectedInvoice(row);
-              setIsModalOpen(true);
-            }}
-            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-colors"
-          >
-            View
-          </button>
-        </div>
+      render: (id, row) => (
+        <button
+          onClick={() => handleDelete(id, row.invoiceNumber)}
+          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+          title="Delete Invoice"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       )
     }
   ];
@@ -90,92 +102,95 @@ export function Invoices() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Commercial Tax Invoices & Accounts Receivable"
-        description="Monitor outstanding receivables, payment statuses and generate compliant commercial tax invoices"
+        title="Commercial Invoices & Accounts Receivable"
+        description="Issue tax compliant customer invoices, track aging schedules and reconcile incoming settlements"
+        actions={
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="btn-primary flex items-center text-xs shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> Issue New Invoice
+          </button>
+        }
       />
 
       <DataTable
-        title="Commercial Invoices Ledger"
+        title="Invoices Ledger"
         columns={columns}
         data={invoices}
         searchPlaceholder="Search invoices..."
       />
 
-      {/* Invoice Preview Modal */}
-      {selectedInvoice && (
-        <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Commercial Tax Invoice">
-          <div className="space-y-6 p-4 bg-slate-950 rounded-2xl border border-slate-800 font-sans text-xs">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div>
-                <h4 className="text-base font-bold text-white tracking-tight">ENTERPRISEPRO ERP SYSTEMS INC</h4>
-                <p className="text-[11px] text-slate-400">100 Innovation Blvd, Austin, TX 78701 • Tax ID: US-8941092</p>
-              </div>
-              <div className="text-right">
-                <span className="font-mono font-bold text-blue-400 text-sm block">{selectedInvoice.invoiceNumber}</span>
-                <span className="text-[10px] text-slate-400">Order: {selectedInvoice.salesOrderNumber}</span>
-              </div>
-            </div>
+      {/* Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Issue Customer Tax Invoice">
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Customer Account</label>
+            <select
+              value={formData.customerId}
+              onChange={(e) => setFormData({ ...formData, customerId: Number(e.target.value) })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
+            >
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              {customers.length === 0 && <option value="1">Elevit Client Corp</option>}
+            </select>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-              <div>
-                <p className="text-slate-400 text-[10px]">Billed To:</p>
-                <p className="text-white font-bold">{selectedInvoice.customerName}</p>
-                <p className="text-slate-400 text-[10px] mt-1">Payment Term: Net 30 Days</p>
-              </div>
-              <div className="text-right">
-                <p className="text-slate-400 text-[10px]">Invoice Date: <b className="text-slate-200">{selectedInvoice.invoiceDate}</b></p>
-                <p className="text-slate-400 text-[10px] mt-1">Due Date: <b className="text-rose-400">{selectedInvoice.dueDate}</b></p>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Total Billable Amount ($)</label>
+              <input
+                type="number"
+                required
+                min={1}
+                value={formData.totalAmount}
+                onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+              />
             </div>
-
-            <div className="border border-slate-800 rounded-xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-900 text-slate-400 uppercase">
-                  <tr>
-                    <th className="py-2.5 px-4">Line Item Description</th>
-                    <th className="py-2.5 px-4 text-right">Amount ($)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-slate-300">
-                  <tr>
-                    <td className="py-3 px-4">Enterprise Server Hardware & ERP Software License Package</td>
-                    <td className="py-3 px-4 text-right font-mono font-bold text-white">
-                      {formatCurrency(selectedInvoice.totalAmount)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Amount Due</span>
-                <span className="text-xl font-bold text-emerald-400 font-mono">{formatCurrency(selectedInvoice.totalAmount)}</span>
-              </div>
-              <Badge variant={selectedInvoice.status === 'PAID' ? 'success' : 'warning'}>
-                {selectedInvoice.status === 'PAID' ? 'FULLY PAID' : 'PAYMENT DUE'}
-              </Badge>
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-2">
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center"
-              >
-                <Printer className="w-3.5 h-3.5 mr-1.5" /> Print Invoice
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold"
-              >
-                Close
-              </button>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Due Date</label>
+              <input
+                type="date"
+                required
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
+              />
             </div>
           </div>
-        </Modal>
-      )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Payment Terms / Memo</label>
+            <textarea
+              rows={3}
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary text-xs"
+            >
+              Issue Invoice
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

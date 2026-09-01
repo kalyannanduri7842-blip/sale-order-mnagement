@@ -1,63 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable } from '../../components/ui/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { api } from '../../services/api';
+import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
-import { Receipt, Plus, CheckCircle2, XCircle } from 'lucide-react';
+import { Receipt, Plus, Trash2, DollarSign } from 'lucide-react';
 
 export function ExpenseTracker() {
-  const [expenses, setExpenses] = useState([]);
+  const { expenses, addExpense, deleteExpense } = useErpData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     category: 'IT & Infrastructure',
-    amount: 1000,
-    expenseDate: new Date().toISOString().split('T')[0],
+    amount: 1500,
     paymentMethod: 'CREDIT_CARD',
-    reference: '',
-    description: ''
+    reference: ''
   });
   const { addToast } = useNotification();
 
-  useEffect(() => {
-    loadExpenses();
-  }, []);
-
-  const loadExpenses = async () => {
-    const data = await api.get('/expenses', 'expenses');
-    setExpenses(Array.isArray(data) ? data : data?.content || []);
-  };
-
-  const handleSave = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    const payload = {
+    addExpense({
       ...formData,
-      expenseNumber: 'EXP-' + (1000 + expenses.length + 1),
-      status: 'APPROVED'
-    };
-    await api.post('/expenses', payload, 'expenses');
-    addToast('Expense Logged', `Expense ${payload.title} ($${formData.amount}) recorded.`, 'success');
+      amount: parseFloat(formData.amount) || 0
+    });
+    addToast('Expense Recorded', `Disbursement of $${formData.amount} posted to ledger.`, 'success');
     setIsModalOpen(false);
-    loadExpenses();
+    setFormData({
+      title: '',
+      category: 'IT & Infrastructure',
+      amount: 1500,
+      paymentMethod: 'CREDIT_CARD',
+      reference: ''
+    });
   };
+
+  const handleDelete = (id, title) => {
+    if (window.confirm(`Are you sure you want to delete expense record: ${title}?`)) {
+      deleteExpense(id);
+      addToast('Expense Deleted', `${title} removed from ledger.`, 'info');
+    }
+  };
+
+  const formatCurrency = (val) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
 
   const columns = [
     {
       header: 'Expense #',
       accessor: 'expenseNumber',
-      render: (val) => <span className="font-mono font-bold text-blue-400">{val}</span>
+      render: (val) => <span className="font-mono font-bold text-blue-600">{val || 'EXP-NEW'}</span>
     },
     {
-      header: 'Description',
+      header: 'Description / Payee',
       accessor: 'title',
-      render: (val, row) => (
-        <div>
-          <span className="font-semibold text-white block">{val}</span>
-          <span className="text-[10px] text-slate-400">Ref: {row.reference || 'N/A'}</span>
-        </div>
-      )
+      render: (val) => <span className="font-bold text-slate-900">{val}</span>
     },
     {
       header: 'Category',
@@ -65,142 +63,139 @@ export function ExpenseTracker() {
       render: (val) => <Badge variant="primary">{val}</Badge>
     },
     {
-      header: 'Date',
+      header: 'Disbursement Date',
       accessor: 'expenseDate',
-      render: (val) => <span className="font-mono text-slate-300">{val}</span>
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val || '2026-08-30'}</span>
     },
     {
       header: 'Amount',
       accessor: 'amount',
-      render: (val) => <span className="font-mono font-bold text-rose-400">${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-    },
-    {
-      header: 'Payment Method',
-      accessor: 'paymentMethod',
-      render: (val) => <span className="text-xs text-slate-300 uppercase">{val}</span>
+      render: (val) => <span className="font-mono font-bold text-rose-600">-{formatCurrency(val)}</span>
     },
     {
       header: 'Status',
       accessor: 'status',
-      render: (val) => <Badge variant="success">{val}</Badge>
+      render: (val) => <Badge variant={val === 'APPROVED' ? 'success' : 'warning'}>{val || 'APPROVED'}</Badge>
+    },
+    {
+      header: 'Actions',
+      accessor: 'id',
+      sortable: false,
+      render: (id, row) => (
+        <button
+          onClick={() => handleDelete(id, row.title)}
+          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+          title="Delete Expense Record"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )
     }
   ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Operational Expenditures & Bills"
-        description="Log corporate receipts, utility expenditures, software vendor subscriptions and cloud bills"
+        title="Operating Expenses & Corporate Disbursements"
+        description="Track departmental expenses, cloud infrastructure, travel reimbursements and corporate vendor billing"
         actions={
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary flex items-center text-xs shadow-sm"
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Log Expenditure
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> Record Expense
           </button>
         }
       />
 
       <DataTable
-        title="Expenditure Ledger"
+        title="Expense Disbursements"
         columns={columns}
         data={expenses}
-        searchPlaceholder="Search expenses..."
+        searchPlaceholder="Search expenses by title, category..."
       />
 
       {/* Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record Corporate Expenditure">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record Operational Expense">
         <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Expense Title / Vendor</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Expense Title / Payee</label>
             <input
               type="text"
               required
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="e.g. Google Cloud Platform billing"
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              placeholder="e.g. AWS Cloud Hosting & Kubernetes Cluster"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Expense Category</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Expense Category</label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               >
                 <option value="IT & Infrastructure">IT & Infrastructure</option>
-                <option value="Utilities & Facilities">Utilities & Facilities</option>
-                <option value="Marketing & Advertising">Marketing & Advertising</option>
+                <option value="Marketing & Growth">Marketing & Growth</option>
+                <option value="Travel & Entertainment">Travel & Entertainment</option>
+                <option value="Office & Facilities">Office & Facilities</option>
                 <option value="Legal & Professional">Legal & Professional</option>
-                <option value="Travel & Meals">Travel & Meals</option>
-                <option value="Office Supplies">Office Supplies</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Amount ($)</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Total Amount ($)</label>
               <input
                 type="number"
                 required
+                min={1}
                 value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Date of Payment</label>
-              <input
-                type="date"
-                required
-                value={formData.expenseDate}
-                onChange={(e) => setFormData({ ...formData, expenseDate: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Payment Method</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Payment Method</label>
               <select
                 value={formData.paymentMethod}
                 onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               >
                 <option value="CREDIT_CARD">Corporate Credit Card</option>
-                <option value="BANK_TRANSFER">Direct Wire / ACH</option>
-                <option value="CASH">Petty Cash</option>
-                <option value="CHECK">Corporate Check</option>
+                <option value="BANK_TRANSFER">Direct Wire / Bank Transfer</option>
+                <option value="PETTY_CASH">Petty Cash</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Receipt Reference #</label>
+              <input
+                type="text"
+                value={formData.reference}
+                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                placeholder="INV-AWS-88910"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+              />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Invoice / Receipt Reference Number</label>
-            <input
-              type="text"
-              value={formData.reference}
-              onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-              placeholder="e.g. INV-99120"
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30"
+              className="btn-primary text-xs"
             >
-              Record Expense
+              Post Expense
             </button>
           </div>
         </form>

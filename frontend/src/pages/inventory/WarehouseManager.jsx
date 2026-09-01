@@ -1,222 +1,206 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { DataTable } from '../../components/ui/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { api } from '../../services/api';
+import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
-import { Warehouse, Plus, MapPin, Phone, Mail, Box, ShieldCheck } from 'lucide-react';
+import { Warehouse, Plus, Trash2, MapPin } from 'lucide-react';
 
 export function WarehouseManager() {
-  const [warehouses, setWarehouses] = useState([]);
+  const { warehouses, addWarehouse, deleteWarehouse } = useErpData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    address: '',
-    city: '',
-    state: 'TX',
-    country: 'USA',
+    location: '',
     managerName: '',
-    contactPhone: '',
-    capacity: 50000
+    capacity: 25000,
+    currentOccupancyPercentage: 45
   });
   const { addToast } = useNotification();
 
-  useEffect(() => {
-    loadWarehouses();
-  }, []);
-
-  const loadWarehouses = async () => {
-    const data = await api.get('/warehouses', 'warehouses');
-    setWarehouses(Array.isArray(data) ? data : data?.content || []);
-  };
-
-  const handleSave = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    const payload = { ...formData, active: true };
-    await api.post('/warehouses', payload, 'warehouses');
-    addToast('Facility Created', `Warehouse ${formData.name} added to logistics network.`, 'success');
+    addWarehouse(formData);
+    addToast('Warehouse Added', `Location ${formData.name} added to supply network.`, 'success');
     setIsModalOpen(false);
-    loadWarehouses();
+    setFormData({
+      name: '',
+      code: '',
+      location: '',
+      managerName: '',
+      capacity: 25000,
+      currentOccupancyPercentage: 45
+    });
   };
+
+  const handleDelete = (id, name) => {
+    if (window.confirm(`Are you sure you want to delete warehouse: ${name}?`)) {
+      deleteWarehouse(id);
+      addToast('Warehouse Deleted', `${name} has been removed.`, 'info');
+    }
+  };
+
+  const columns = [
+    {
+      header: 'Code',
+      accessor: 'code',
+      render: (val) => <span className="font-mono font-bold text-blue-600">{val || 'WH-NEW'}</span>
+    },
+    {
+      header: 'Warehouse Name',
+      accessor: 'name',
+      render: (val) => <span className="font-bold text-slate-900">{val}</span>
+    },
+    {
+      header: 'City / Location',
+      accessor: 'location',
+      render: (val) => (
+        <div className="flex items-center text-slate-700">
+          <MapPin className="w-3.5 h-3.5 mr-1 text-slate-400" />
+          <span>{val}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Facility Manager',
+      accessor: 'managerName',
+      render: (val) => <span className="text-slate-700 font-medium">{val || 'Unassigned'}</span>
+    },
+    {
+      header: 'Capacity',
+      accessor: 'capacity',
+      render: (val) => <span className="font-mono font-bold text-slate-900">{val?.toLocaleString()} sq.ft</span>
+    },
+    {
+      header: 'Occupancy',
+      accessor: 'currentOccupancyPercentage',
+      render: (val) => (
+        <div className="flex items-center space-x-2">
+          <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+            <div
+              className="bg-blue-600 h-full rounded-full"
+              style={{ width: `${val || 45}%` }}
+            />
+          </div>
+          <span className="font-mono font-bold text-xs text-slate-700">{val || 45}%</span>
+        </div>
+      )
+    },
+    {
+      header: 'Actions',
+      accessor: 'id',
+      sortable: false,
+      render: (id, row) => (
+        <button
+          onClick={() => handleDelete(id, row.name)}
+          className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+          title="Delete Warehouse"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )
+    }
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Warehouse Facilities & Storage Nodes"
-        description="Multi-facility logistics management, storage capacity tracking and regional distribution hubs"
+        title="Multi-Warehouse & Facility Management"
+        description="Monitor physical warehouse hubs, square footage utilization, facility managers and inventory distribution"
         actions={
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary flex items-center text-xs shadow-sm"
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Warehouse Facility
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Warehouse
           </button>
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {warehouses.map((wh) => (
-          <div
-            key={wh.id}
-            className="bg-slate-900/70 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-md space-y-4 transition-all hover:border-slate-700"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-3 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400">
-                  <Warehouse className="w-6 h-6" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">{wh.name}</h3>
-                  <span className="font-mono text-xs text-blue-400 font-bold">{wh.code}</span>
-                </div>
-              </div>
-              <Badge variant="success">OPERATIONAL</Badge>
-            </div>
-
-            {/* Address and details */}
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex items-center text-slate-400">
-                <MapPin className="w-4 h-4 mr-2 text-slate-500 flex-shrink-0" />
-                <span>{wh.address}, {wh.city}, {wh.state} {wh.country}</span>
-              </div>
-              <div className="flex items-center text-slate-400">
-                <Phone className="w-4 h-4 mr-2 text-slate-500 flex-shrink-0" />
-                <span>{wh.contactPhone || '+1-800-555-0199'}</span>
-              </div>
-              <div className="flex items-center text-slate-400">
-                <ShieldCheck className="w-4 h-4 mr-2 text-slate-500 flex-shrink-0" />
-                <span>Facility Manager: <b className="text-slate-200">{wh.managerName || 'Operations Lead'}</b></span>
-              </div>
-            </div>
-
-            {/* Capacity Meter */}
-            <div className="pt-2 border-t border-slate-800/80">
-              <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-slate-400 font-medium">Storage Capacity Allocation</span>
-                <span className="font-mono font-bold text-white">68% Utilized ({(wh.capacity * 0.68).toLocaleString()} / {Number(wh.capacity || 50000).toLocaleString()} units)</span>
-              </div>
-              <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
-                <div className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2.5 rounded-full" style={{ width: '68%' }} />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DataTable
+        title="Warehouse Facilities"
+        columns={columns}
+        data={warehouses}
+        searchPlaceholder="Search warehouses..."
+      />
 
       {/* Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Register Logistics Warehouse Node">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Warehouse Facility">
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Facility Name</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Facility Name</label>
               <input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Newark East Coast Distribution"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                placeholder="e.g. Hyderabad Central Distribution Hub"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Facility Code</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Warehouse Code</label>
               <input
                 type="text"
-                required
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="WH-EAST"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Street Address</label>
-            <input
-              type="text"
-              required
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="e.g. 500 Route 1 South"
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">City</label>
-              <input
-                type="text"
-                required
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                placeholder="Newark"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">State / Province</label>
-              <input
-                type="text"
-                required
-                value={formData.state}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                placeholder="NJ"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Country</label>
-              <input
-                type="text"
-                required
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="USA"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                placeholder="WH-HYD-01"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Facility Manager</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">City / Region</label>
               <input
                 type="text"
                 required
-                value={formData.managerName}
-                onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
-                placeholder="e.g. John Miller"
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="e.g. Hyderabad, Telangana"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Total Unit Storage Capacity</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Facility Manager</label>
               <input
-                type="number"
-                required
-                value={formData.capacity}
-                onChange={(e) => setFormData({ ...formData, capacity: Number(e.target.value) })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                type="text"
+                value={formData.managerName}
+                onChange={(e) => setFormData({ ...formData, managerName: e.target.value })}
+                placeholder="e.g. Marcus Vance"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
               />
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Total Storage Capacity (sq. ft)</label>
+            <input
+              type="number"
+              min={100}
+              value={formData.capacity}
+              onChange={(e) => setFormData({ ...formData, capacity: Number(e.target.value) })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30"
+              className="btn-primary text-xs"
             >
-              Register Facility
+              Add Warehouse
             </button>
           </div>
         </form>

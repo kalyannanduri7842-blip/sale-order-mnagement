@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ErpDataProvider } from './context/ErpDataContext';
 import { AppRoutes } from './routes/AppRoutes';
 
 export default function App() {
@@ -10,9 +11,11 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <NotificationProvider>
-            <AppRoutes />
-          </NotificationProvider>
+          <ErpDataProvider>
+            <NotificationProvider>
+              <AppRoutes />
+            </NotificationProvider>
+          </ErpDataProvider>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

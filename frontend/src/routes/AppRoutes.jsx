@@ -6,7 +6,8 @@ import { MainLayout } from '../components/layout/MainLayout';
 import { AuthLayout } from '../components/layout/AuthLayout';
 import { ProtectedRoute } from '../components/layout/ProtectedRoute';
 
-// Auth Pages
+// Public Landing Page & Auth
+import { LandingPage } from '../pages/LandingPage';
 import { Login } from '../pages/auth/Login';
 import { Register } from '../pages/auth/Register';
 
@@ -54,6 +55,10 @@ import { SystemSettings } from '../pages/system/SystemSettings';
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Public Landing Page */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/landing" element={<LandingPage />} />
+
       {/* Auth Public Routes */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<Login />} />
@@ -63,9 +68,6 @@ export function AppRoutes() {
       {/* Authenticated Workspace Routes */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
-          {/* Default Redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
           {/* Executive Dashboard */}
           <Route path="/dashboard" element={<ExecutiveDashboard />} />
 
@@ -109,8 +111,8 @@ export function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Catch-all 404 redirect */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all redirect to Landing */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

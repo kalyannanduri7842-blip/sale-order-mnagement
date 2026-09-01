@@ -1,125 +1,115 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { DataTable } from '../../components/ui/DataTable';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { api } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
-import { CalendarPlus, CheckCheck, XCircle, Clock } from 'lucide-react';
+import { CalendarDays, Plus, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 
 export function LeaveManagement() {
-  const { user } = useAuth();
-  const [leaves, setLeaves] = useState([]);
+  const { leaveRequests, addLeaveRequest, updateLeaveStatus, deleteLeaveRequest, employees } = useErpData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
+    employeeName: employees[0]?.firstName ? `${employees[0].firstName} ${employees[0].lastName}` : 'Alex Rivers',
     leaveType: 'ANNUAL',
     startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    reason: ''
+    endDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+    totalDays: 3,
+    reason: 'Personal vacation'
   });
   const { addToast } = useNotification();
 
-  useEffect(() => {
-    loadLeaves();
-  }, []);
-
-  const loadLeaves = async () => {
-    const data = await api.get('/leaves', 'leaveRequests');
-    setLeaves(Array.isArray(data) ? data : data?.content || []);
-  };
-
-  const handleApply = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      employeeId: user?.id || 1,
-      employeeName: user?.fullName || 'Current User',
-      employeeCode: 'EMP-1001',
-      totalDays: 2,
-      status: 'PENDING',
-      createdAt: new Date().toISOString()
-    };
-    await api.post('/leaves', payload, 'leaveRequests');
-    addToast('Leave Request Submitted', 'Forwarded to HR department for approval.', 'success');
+    addLeaveRequest(formData);
+    addToast('Leave Requested', `Leave application submitted for ${formData.employeeName}.`, 'success');
     setIsModalOpen(false);
-    loadLeaves();
   };
 
-  const handleApprove = async (id) => {
-    await api.put(`/leaves/${id}/approve`, { approverEmployeeId: user?.id || 1 }, 'leaveRequests');
-    addToast('Leave Approved', 'Request marked as approved.', 'success');
-    setLeaves(leaves.map((l) => (l.id === id ? { ...l, status: 'APPROVED', approvedByName: user?.fullName || 'Manager' } : l)));
+  const handleApprove = (id, emp) => {
+    updateLeaveStatus(id, 'APPROVED');
+    addToast('Leave Approved', `Leave approved for ${emp}.`, 'success');
   };
 
-  const handleReject = async (id) => {
-    await api.put(`/leaves/${id}/reject`, { approverEmployeeId: user?.id || 1, reason: 'Department requirements' }, 'leaveRequests');
-    addToast('Leave Rejected', 'Request marked as rejected.', 'warning');
-    setLeaves(leaves.map((l) => (l.id === id ? { ...l, status: 'REJECTED' } : l)));
+  const handleReject = (id, emp) => {
+    updateLeaveStatus(id, 'REJECTED');
+    addToast('Leave Rejected', `Leave rejected for ${emp}.`, 'info');
+  };
+
+  const handleDelete = (id, emp) => {
+    if (window.confirm(`Delete leave application for ${emp}?`)) {
+      deleteLeaveRequest(id);
+      addToast('Application Deleted', 'Leave application removed.', 'info');
+    }
   };
 
   const columns = [
     {
-      header: 'Employee',
+      header: 'Staff Member',
       accessor: 'employeeName',
-      render: (val, row) => (
-        <div>
-          <span className="font-semibold text-white block">{val}</span>
-          <span className="text-[10px] text-slate-400">{row.departmentName}</span>
-        </div>
-      )
+      render: (val) => <span className="font-bold text-slate-900">{val}</span>
     },
     {
-      header: 'Leave Type',
+      header: 'Leave Category',
       accessor: 'leaveType',
       render: (val) => <Badge variant="primary">{val}</Badge>
     },
     {
-      header: 'Dates',
+      header: 'Start Date',
       accessor: 'startDate',
-      render: (val, row) => (
-        <span className="text-xs text-slate-300 font-mono">
-          {val} to {row.endDate} ({row.totalDays} days)
-        </span>
-      )
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val}</span>
     },
     {
-      header: 'Reason',
-      accessor: 'reason',
-      render: (val) => <span className="text-xs text-slate-400 italic">"{val}"</span>
+      header: 'End Date',
+      accessor: 'endDate',
+      render: (val) => <span className="font-mono text-slate-600 text-xs">{val}</span>
+    },
+    {
+      header: 'Duration',
+      accessor: 'totalDays',
+      render: (val) => <span className="font-mono font-bold text-slate-900">{val} days</span>
     },
     {
       header: 'Status',
       accessor: 'status',
-      render: (val) => <Badge variant="default">{val}</Badge>
+      render: (val) => (
+        <Badge variant={val === 'APPROVED' ? 'success' : val === 'REJECTED' ? 'danger' : 'warning'}>
+          {val}
+        </Badge>
+      )
     },
     {
       header: 'Actions',
       accessor: 'id',
       sortable: false,
-      render: (val, row) => (
+      render: (id, row) => (
         <div className="flex items-center space-x-2">
           {row.status === 'PENDING' && (
             <>
               <button
-                onClick={() => handleApprove(val)}
-                className="p-1.5 rounded-lg bg-emerald-950 hover:bg-emerald-900 border border-emerald-700/50 text-emerald-300 text-xs font-semibold flex items-center transition-colors"
+                onClick={() => handleApprove(id, row.employeeName)}
+                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold transition-colors"
                 title="Approve"
               >
-                <CheckCheck className="w-3.5 h-3.5 mr-1" /> Approve
+                Approve
               </button>
               <button
-                onClick={() => handleReject(val)}
-                className="p-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-700/50 text-rose-300 text-xs font-semibold flex items-center transition-colors"
+                onClick={() => handleReject(id, row.employeeName)}
+                className="px-2 py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-lg text-xs font-bold transition-colors"
                 title="Reject"
               >
-                <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                Reject
               </button>
             </>
           )}
-          {row.status === 'APPROVED' && (
-            <span className="text-[10px] text-slate-400">Approved by {row.approvedByName || 'HR'}</span>
-          )}
+          <button
+            onClick={() => handleDelete(id, row.employeeName)}
+            className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+            title="Delete Application"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
       )
     }
@@ -128,89 +118,115 @@ export function LeaveManagement() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Leave Management & Paid Time Off (PTO)"
-        description="Review vacation, sick leave and casual applications with multi-tier managerial approval workflows"
+        title="Leave Management & Time-Off Approvals"
+        description="Employee time-off requests, annual vacation allotments, medical leaves and manager approval workflow"
         actions={
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/20 transition-all"
+            className="btn-primary flex items-center text-xs shadow-sm"
           >
-            <CalendarPlus className="w-3.5 h-3.5 mr-1.5" /> Apply for Leave
+            <Plus className="w-3.5 h-3.5 mr-1.5" /> Submit Leave Request
           </button>
         }
       />
 
       <DataTable
-        title="Leave Applications Feed"
+        title="Time-Off Applications"
         columns={columns}
-        data={leaves}
-        searchPlaceholder="Search leaves..."
+        data={leaveRequests}
+        searchPlaceholder="Search leave requests..."
       />
 
       {/* Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Submit Leave Request">
-        <form onSubmit={handleApply} className="space-y-4">
+        <form onSubmit={handleSave} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Leave Category</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Staff Member</label>
             <select
-              value={formData.leaveType}
-              onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              value={formData.employeeName}
+              onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
             >
-              <option value="ANNUAL">Annual Vacation Leave</option>
-              <option value="SICK">Medical & Sick Leave</option>
-              <option value="CASUAL">Casual Personal Leave</option>
-              <option value="MATERNITY_PATERNITY">Parental Leave</option>
-              <option value="UNPAID">Unpaid Leave</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={`${emp.firstName} ${emp.lastName}`}>
+                  {emp.firstName} {emp.lastName} ({emp.departmentName})
+                </option>
+              ))}
+              {employees.length === 0 && <option value="Alex Rivers">Alex Rivers</option>}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">From Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Leave Type</label>
+              <select
+                value={formData.leaveType}
+                onChange={(e) => setFormData({ ...formData, leaveType: e.target.value })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
+              >
+                <option value="ANNUAL">Annual Paid Vacation</option>
+                <option value="SICK">Sick & Medical Leave</option>
+                <option value="CASUAL">Casual Day-Off</option>
+                <option value="UNPAID">Unpaid Personal Leave</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Total Days</label>
+              <input
+                type="number"
+                required
+                min={1}
+                value={formData.totalDays}
+                onChange={(e) => setFormData({ ...formData, totalDays: Number(e.target.value) })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Start Date</label>
               <input
                 type="date"
                 required
                 value={formData.startDate}
                 onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">To Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">End Date</label>
               <input
                 type="date"
                 required
                 value={formData.endDate}
                 onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Reason for Absence</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Justification</label>
             <textarea
-              required
               rows={3}
               value={formData.reason}
               onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-              placeholder="State the reason..."
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
             />
           </div>
 
-          <div className="pt-4 border-t border-slate-800 flex justify-end space-x-3">
+          <div className="pt-4 border-t border-slate-100 flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-blue-600/30 transition-colors"
+              className="btn-primary text-xs"
             >
               Submit Application
             </button>
