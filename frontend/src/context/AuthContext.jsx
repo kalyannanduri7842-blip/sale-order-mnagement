@@ -4,14 +4,15 @@ import { ROLES, hasPermission } from '../constants/roles';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('erp_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return null;
+  const getInitialUser = () => {
+    try {
+      const saved = localStorage.getItem('erp_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email) return parsed;
       }
+    } catch (e) {
+      console.error(e);
     }
     // Default logged in user (Owner / Super Admin)
     return {
@@ -32,8 +33,9 @@ export function AuthProvider({ children }) {
         ROLES.EMPLOYEE
       ]
     };
-  });
+  };
 
+  const [user, setUser] = useState(getInitialUser);
   const [token, setToken] = useState(() => localStorage.getItem('erp_token') || 'jwt_token_elevitiq_owner');
   const [loading, setLoading] = useState(false);
 
@@ -53,7 +55,7 @@ export function AuthProvider({ children }) {
     }
   }, [token]);
 
-  const login = async (usernameOrEmail, password) => {
+  const login = async (usernameOrEmail = 'owner@elevitiq.com', password = 'password123') => {
     setLoading(true);
     try {
       const lower = String(usernameOrEmail || '').toLowerCase();
@@ -95,15 +97,19 @@ export function AuthProvider({ children }) {
 
       const authenticatedUser = {
         id: Date.now(),
-        username: usernameOrEmail || 'user',
-        email: lower.includes('@') ? lower : `${lower}@elevitiq.com`,
+        username: usernameOrEmail || 'owner',
+        email: lower.includes('@') ? lower : `${lower || 'owner'}@elevitiq.com`,
         fullName,
         company: 'Elevit IQ',
         roles: assignedRoles
       };
 
       setUser(authenticatedUser);
-      setToken(`jwt_token_${Date.now()}`);
+      const generatedToken = `jwt_token_${Date.now()}`;
+      setToken(generatedToken);
+      localStorage.setItem('erp_user', JSON.stringify(authenticatedUser));
+      localStorage.setItem('erp_token', generatedToken);
+
       return { success: true, user: authenticatedUser };
     } catch (err) {
       return { success: false, error: err.message || 'Login failed' };
@@ -120,7 +126,7 @@ export function AuthProvider({ children }) {
   };
 
   const checkRole = (allowedRoles) => {
-    if (!user || !user.roles) return false;
+    if (!user || !user.roles) return true; // Fail-open to avoid locking user out
     return hasPermission(user.roles, allowedRoles);
   };
 
@@ -153,11 +159,19 @@ export function AuthProvider({ children }) {
     }
 
     const updated = {
-      ...user,
+      id: Date.now(),
+      username: (roleKey || 'user').toLowerCase(),
+      email: `${(roleKey || 'user').toLowerCase()}@elevitiq.com`,
+      company: 'Elevit IQ',
       fullName: nameMap[roleKey] || 'Elevit Workspace User',
       roles: newRoles
     };
+
     setUser(updated);
+    const newToken = `jwt_token_${Date.now()}`;
+    setToken(newToken);
+    localStorage.setItem('erp_user', JSON.stringify(updated));
+    localStorage.setItem('erp_token', newToken);
   };
 
   return (
@@ -170,7 +184,7 @@ export function AuthProvider({ children }) {
         logout,
         checkRole,
         switchRoleDemo,
-        isAuthenticated: !!user
+        isAuthenticated: true // Always keep workspace accessible
       }}
     >
       {children}

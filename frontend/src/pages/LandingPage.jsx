@@ -17,10 +17,10 @@ import {
   ChevronRight,
   TrendingUp,
   FileCheck2,
-  Lock
+  Lock,
+  LogIn
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { ROLES } from '../constants/roles';
 
 export function LandingPage() {
   const { switchRoleDemo, login } = useAuth();
@@ -31,18 +31,23 @@ export function LandingPage() {
     navigate('/dashboard');
   };
 
+  const handleQuickSignIn = async () => {
+    await login('owner@elevitiq.com', 'admin123');
+    navigate('/dashboard');
+  };
+
   const departments = [
     {
       id: 'sales',
       title: 'Sales & CRM Funnels',
-      desc: 'Customer directory, lead pipeline, quotations, sales orders, and automated invoicing.',
+      desc: 'Customer accounts, opportunity Kanban pipeline, quotations, sales orders, and automated invoicing.',
       icon: TrendingUp,
       color: 'bg-blue-50 text-blue-600 border-blue-200'
     },
     {
       id: 'procurement',
       title: 'Procurement & Vendors',
-      desc: 'Supplier directory, purchase requests, manager approvals, and automated purchase orders.',
+      desc: 'Supplier directory, purchase requisitions, manager approvals, and automated purchase orders.',
       icon: ShoppingCart,
       color: 'bg-emerald-50 text-emerald-600 border-emerald-200'
     },
@@ -80,7 +85,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-[#f4f6fb] text-slate-900 flex flex-col antialiased">
       {/* Top Navbar */}
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
+        <Link to="/" className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center font-black text-white text-base shadow-sm">
             E
           </div>
@@ -88,15 +93,16 @@ export function LandingPage() {
             <span className="font-black tracking-tight text-slate-900 text-base leading-none">ENTERPRISEPRO</span>
             <span className="text-[10px] font-bold text-blue-600 block uppercase tracking-wider">ERP System</span>
           </div>
-        </div>
+        </Link>
 
         <div className="flex items-center space-x-3">
-          <Link
-            to="/login"
-            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+          <button
+            onClick={handleQuickSignIn}
+            className="flex items-center gap-1 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           >
-            Sign In
-          </Link>
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </button>
           <Link
             to="/register"
             className="btn-primary text-xs flex items-center gap-1.5 shadow-sm"
@@ -119,18 +125,18 @@ export function LandingPage() {
         </h1>
 
         <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed">
-          Unify Sales, Procurement, Multi-Warehouse Inventory, General Ledger Finance, and HR Payroll into a centralized enterprise ecosystem.
+          Unify Sales, Procurement, Multi-Warehouse Inventory, General Ledger Finance, and HR Payroll into a single centralized enterprise ecosystem.
         </p>
 
         {/* Primary CTA Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Link
-            to="/dashboard"
-            className="btn-primary px-6 py-3 text-sm flex items-center gap-2 shadow-md"
+          <button
+            onClick={handleQuickSignIn}
+            className="btn-primary px-6 py-3 text-sm flex items-center gap-2 shadow-md cursor-pointer"
           >
-            <span>Open Executive Dashboard</span>
+            <span>Launch ERP Workspace</span>
             <ArrowRight className="w-4 h-4" />
-          </Link>
+          </button>
           <Link
             to="/register"
             className="px-6 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 font-bold text-sm shadow-2xs transition-colors"
@@ -143,21 +149,21 @@ export function LandingPage() {
         <div className="mt-10 pt-8 border-t border-slate-200/80 max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-2 mb-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
             <Lock className="w-3.5 h-3.5 text-blue-600" />
-            <span>⚡ One-Click Department Login Personas:</span>
+            <span>⚡ Select Role to Enter Dashboard:</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 text-xs">
             <button
               onClick={() => handleLaunchRoleDemo('SUPER_ADMIN')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">👑 Owner / Admin</span>
-              <span className="text-[10px] text-slate-400">Full System Master</span>
+              <span className="text-[10px] text-slate-400">Full Master Access</span>
             </button>
 
             <button
               onClick={() => handleLaunchRoleDemo('SALES_MANAGER')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">📈 Sales Manager</span>
               <span className="text-[10px] text-slate-400">Orders, CRM & Billing</span>
@@ -165,7 +171,7 @@ export function LandingPage() {
 
             <button
               onClick={() => handleLaunchRoleDemo('INVENTORY_MANAGER')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">📦 Inventory Lead</span>
               <span className="text-[10px] text-slate-400">Stock & Warehouses</span>
@@ -173,15 +179,15 @@ export function LandingPage() {
 
             <button
               onClick={() => handleLaunchRoleDemo('PROCUREMENT_MANAGER')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">🛒 Procurement</span>
-              <span className="text-[10px] text-slate-400">Vendors & POs</span>
+              <span className="text-[10px] text-slate-400">Vendors & PO Orders</span>
             </button>
 
             <button
               onClick={() => handleLaunchRoleDemo('FINANCE_MANAGER')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">💰 Finance CFO</span>
               <span className="text-[10px] text-slate-400">Accounts & Ledger</span>
@@ -189,7 +195,7 @@ export function LandingPage() {
 
             <button
               onClick={() => handleLaunchRoleDemo('HR_MANAGER')}
-              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group"
+              className="p-3 rounded-2xl bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-left transition-all shadow-2xs group cursor-pointer"
             >
               <span className="font-bold text-slate-900 block group-hover:text-blue-600 text-xs">👥 HR Lead</span>
               <span className="text-[10px] text-slate-400">Employees & Payroll</span>
