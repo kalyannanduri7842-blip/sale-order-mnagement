@@ -1,0 +1,16 @@
+{
+  "name": "enterprisepro-erp",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build && mvn -q -f backend/pom.xml package -DskipTests",
+    "start": "mvn -q -f backend/pom.xml spring-boot:run",
+    "backend:dev": "mvn -q -f backend/pom.xml spring-boot:run",
+    "frontend:dev": "npm --prefix frontend run dev"
+  },
+  "engines": {
+    "node": ">=18",
+    "java": ">=17"
+  }
+}
