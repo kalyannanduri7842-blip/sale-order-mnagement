@@ -4,6 +4,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Badge } from '../../components/ui/Badge';
 import { useErpData } from '../../context/ErpDataContext';
 import { useNotification } from '../../context/NotificationContext';
+import { INITIAL_MOCK_DATA } from '../../constants/mockData';
 import {
   DollarSign,
   TrendingUp,
@@ -39,25 +40,33 @@ const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 export function ExecutiveDashboard() {
   const {
     dashboard,
-    customers,
-    salesOrders,
-    invoices,
-    products,
-    employees,
-    expenses,
-    auditLogs,
+    customers = [],
+    salesOrders = [],
+    invoices = [],
+    products = [],
+    employees = [],
+    expenses = [],
+    auditLogs = [],
     loadDemoData,
     clearAllData
   } = useErpData();
   const { addToast } = useNotification();
 
+  const safeSales = Array.isArray(salesOrders) ? salesOrders : [];
+  const safeInvoices = Array.isArray(invoices) ? invoices : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeEmployees = Array.isArray(employees) ? employees : [];
+  const safeCustomers = Array.isArray(customers) ? customers : [];
+  const safeLogs = Array.isArray(auditLogs) ? auditLogs : [];
+
   // Dynamically compute live KPIs
-  const totalSalesVal = salesOrders.reduce((sum, o) => sum + (parseFloat(o.grandTotal || o.totalAmount) || 0), 0);
-  const totalInvoicedVal = invoices.reduce((sum, i) => sum + (parseFloat(i.totalAmount) || 0), 0);
-  const totalInventoryVal = products.reduce((sum, p) => sum + (p.stockQuantity * (p.unitCost || p.sellingPrice * 0.6)), 0);
-  const totalExpensesVal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-  const lowStockCount = products.filter(p => Number(p.stockQuantity) <= Number(p.reorderLevel || 10)).length;
-  const activeStaffCount = employees.length;
+  const totalSalesVal = safeSales.reduce((sum, o) => sum + (parseFloat(o?.grandTotal || o?.totalAmount) || 0), 0);
+  const totalInvoicedVal = safeInvoices.reduce((sum, i) => sum + (parseFloat(i?.totalAmount) || 0), 0);
+  const totalInventoryVal = safeProducts.reduce((sum, p) => sum + ((p?.stockQuantity || 0) * (p?.unitCost || (p?.sellingPrice || 0) * 0.6)), 0);
+  const totalExpensesVal = safeExpenses.reduce((sum, e) => sum + (parseFloat(e?.amount) || 0), 0);
+  const lowStockCount = safeProducts.filter(p => Number(p?.stockQuantity || 0) <= Number(p?.reorderLevel || 10)).length;
+  const activeStaffCount = safeEmployees.length;
 
   const handleLoadDemo = () => {
     loadDemoData();
@@ -74,8 +83,16 @@ export function ExecutiveDashboard() {
   const formatCurrency = (val) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val || 0);
 
+  const revenueChartData = (dashboard && Array.isArray(dashboard.monthlyRevenueChart) && dashboard.monthlyRevenueChart.length > 0)
+    ? dashboard.monthlyRevenueChart
+    : INITIAL_MOCK_DATA.dashboard.monthlyRevenueChart;
+
+  const productCategoryData = (dashboard && Array.isArray(dashboard.salesByProductCategory) && dashboard.salesByProductCategory.length > 0)
+    ? dashboard.salesByProductCategory
+    : INITIAL_MOCK_DATA.dashboard.salesByProductCategory;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in">
       {/* Header with Demo Data Controls */}
       <PageHeader
         title="Executive Overview & Business KPIs"
@@ -84,7 +101,7 @@ export function ExecutiveDashboard() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleLoadDemo}
-              className="flex items-center px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+              className="flex items-center px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
               title="Load demo data"
             >
               <RefreshCw className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> ⚡ Load Demo Data
@@ -92,7 +109,7 @@ export function ExecutiveDashboard() {
 
             <button
               onClick={handleClearData}
-              className="flex items-center px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs"
+              className="flex items-center px-3 py-2 bg-white hover:bg-rose-50 text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
               title="Clear all data to start fresh"
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" /> 🗑️ Clear Workspace
@@ -100,7 +117,7 @@ export function ExecutiveDashboard() {
 
             <Link
               to="/sales/orders"
-              className="btn-primary flex items-center text-xs shadow-sm"
+              className="btn-primary flex items-center text-xs shadow-sm cursor-pointer"
             >
               <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> + Sales Order
             </Link>
@@ -113,7 +130,7 @@ export function ExecutiveDashboard() {
         <StatCard
           title="Total Invoiced"
           value={formatCurrency(totalInvoicedVal || 142500)}
-          change={`${invoices.length} Invoices`}
+          change={`${safeInvoices.length} Invoices`}
           isPositive={true}
           icon={DollarSign}
           color="blue"
@@ -122,11 +139,11 @@ export function ExecutiveDashboard() {
         <StatCard
           title="Sales Volume"
           value={formatCurrency(totalSalesVal || 842000)}
-          change={`${salesOrders.length} Orders`}
+          change={`${safeSales.length} Orders`}
           isPositive={true}
           icon={TrendingUp}
           color="emerald"
-          subtitle={`${customers.length} Active Enterprise Clients`}
+          subtitle={`${safeCustomers.length} Active Enterprise Clients`}
         />
         <StatCard
           title="Inventory Assets"
@@ -135,7 +152,7 @@ export function ExecutiveDashboard() {
           isPositive={lowStockCount === 0}
           icon={Package}
           color="amber"
-          subtitle={`${products.length} SKU Catalog Items`}
+          subtitle={`${safeProducts.length} SKU Catalog Items`}
         />
         <StatCard
           title="Workforce Roster"
@@ -161,7 +178,7 @@ export function ExecutiveDashboard() {
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={dashboard?.monthlyRevenueChart || []}>
+              <AreaChart data={revenueChartData}>
                 <defs>
                   <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
@@ -197,7 +214,7 @@ export function ExecutiveDashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={dashboard?.salesByProductCategory || []}
+                  data={productCategoryData}
                   cx="50%"
                   cy="50%"
                   innerRadius={50}
@@ -206,7 +223,7 @@ export function ExecutiveDashboard() {
                   dataKey="value"
                   nameKey="category"
                 >
-                  {(dashboard?.salesByProductCategory || []).map((entry, index) => (
+                  {productCategoryData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -218,7 +235,7 @@ export function ExecutiveDashboard() {
             </ResponsiveContainer>
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 pt-2 border-t border-slate-100 font-medium">
-            {(dashboard?.salesByProductCategory || []).map((item, idx) => (
+            {productCategoryData.map((item, idx) => (
               <div key={idx} className="flex items-center space-x-1.5">
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                 <span className="truncate font-semibold text-slate-700">{item.category} ({item.value}%)</span>
@@ -241,23 +258,28 @@ export function ExecutiveDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {(auditLogs || []).slice(0, 4).map((act) => (
-            <div key={act.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+          {safeLogs.slice(0, 4).map((act) => (
+            <div key={act?.id || Math.random()} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <Badge variant="primary">{act.module}</Badge>
+                  <Badge variant="primary">{act?.module || 'SYSTEM'}</Badge>
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {new Date(act.timestamp).toLocaleTimeString()}
+                    {act?.timestamp ? new Date(act.timestamp).toLocaleTimeString() : '10:00 AM'}
                   </span>
                 </div>
-                <p className="text-xs font-bold text-slate-900 line-clamp-1">{act.action}</p>
-                <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{act.description}</p>
+                <p className="text-xs font-bold text-slate-900 line-clamp-1">{act?.action || 'ACTION'}</p>
+                <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{act?.description || 'System event recorded'}</p>
               </div>
               <div className="text-[10px] text-slate-400 mt-2 font-medium">
-                By: <span className="font-bold text-slate-700">{act.user || 'Admin'}</span>
+                By: <span className="font-bold text-slate-700">{act?.user || 'Elevit Owner'}</span>
               </div>
             </div>
           ))}
+          {safeLogs.length === 0 && (
+            <div className="col-span-4 py-6 text-center text-slate-400 text-xs">
+              No recent operations activity. Perform any add or delete action to start the audit log.
+            </div>
+          )}
         </div>
       </div>
     </div>
